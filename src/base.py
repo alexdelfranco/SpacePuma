@@ -237,3 +237,59 @@ class widget_base:
         elif data_key not in self.data_global[ax].keys():
             # Else, merge the dictionary with a new one
             self.data_global[ax] = self.data_global[ax] | self.data_init()
+
+    def printdict(self,dictionary,indent=''):
+        if indent=='': print('Dictionary')
+        # If the input is a dictionary
+        if isinstance(dictionary,dict):
+            # Save the list of keys
+            keys = list(dictionary.keys())
+            # Set the indent strings
+            tab = ' |  '
+            turn = ' |--'
+            # For each key of the dictionary
+            for key in keys:
+                # # Check if it is the final key
+                if key == keys[-1]:
+                    # Set special indent strings
+                    tab = '    '
+                    turn = " '--"
+                # Print the dictionary key
+                print(f'{indent}{turn}{key}')
+                # Check to see if it has any subdictionaries
+                self.printdict(dictionary[key],indent+tab)
+        # Once all sub-dictionaries have been printed, return
+        else: return
+
+    def fig_show(self,fig):
+        # Create a new figure
+        figure = plt.figure()
+        # Create a new manager
+        manager = figure.canvas.manager
+        # Overwrite the figure in the manager
+        manager.canvas.figure = fig
+        # Set the figure canvas to the manager's canvas
+        fig.set_canvas(manager.canvas)
+
+# PRINT AND RETURN METHODS
+
+    def data_tree(self):
+        self.printdict(self.data)
+
+    def artist_tree(self):
+        self.printdict(self.artists)
+
+    def get_data(self):
+        return self.data
+
+    def get_artists(self):
+        return self.artists
+
+    def get_fig(self):
+        return self.fig
+
+    def get_axes(self):
+        return self.fig.axes
+
+    def export_dict(self):
+        return {}

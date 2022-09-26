@@ -7,48 +7,85 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
+import copy as cp
+import pickle as pkl
 
 import importlib as imp
 from base import widget_base
 from baseline import baseline
-from integrate import integrate
-from peaks import peaks
+from fit import fit
+from int_peaks import int_peaks
+from labels import labels
+from display_tools import display_tools
+from export import export
 
 from scipy import integrate as scpyintegrate
 import functools
 
 class main_menu(widget_base):
-    def __init__(self,fig=None,ax=None,data=None):
+    def __init__(self,data,load_file=None,fig=None,ax=None,exp_path=''):
         '''
         Initializes a widget instance
         '''
+        # Close any earlier plots
+        plt.close()
+
         # Initialize widget parameters
         self.widget_on = True
         self.active_widget = self
         self.prev_widget = self
-        self.menu, self.sub_menu = widgets.HBox(),widgets.HBox()
+        self.menu,self.sub_menu = widgets.HBox(),widgets.HBox()
+
+        # Check for an load dictionary
+        if load_file is not None:
+            plt.ioff()
+            load = cp.deepcopy(pkl.load(open(load_file,'rb')))
+            fig = load['fig']; ax = fig.axes
+            plt.ion()
+        else: load = None
 
         # Initialize figure
         self.fig_init(fig,ax)
-        # Initialize artist list
-        self.artists = dict.fromkeys(self.fig.axes,{})
-        # Import the data from the initialized instance
-        self.artists[self.ax]['Input Data'],self.input_data = self.setup_data(data)
-        self.artists['Primary Artists'] = {self.ax:'Input Data'}
-        self.artists['Interactive Axes'] = [self.ax]
 
-        # Initialize data list
-        self.data = dict.fromkeys(self.fig.axes,{})
+        if load is None:
+            # Initialize artist list
+            self.artists = dict.fromkeys(self.fig.axes,{})
+            # Import the data from the initialized instance
+            self.artists[self.ax]['Input Data'],self.input_data = self.setup_data(data)
+            self.artists['Primary Artists'] = {self.ax:'Input Data'}
+            self.artists['Interactive Axes'] = [self.ax]
+
+            # Initialize data list
+            self.data = dict.fromkeys(self.fig.axes,{})
+
+        else:
+            self.artists = load['artists_global']
+            self.data = load['data_global']
 
         # Initialize all sub_menus
-        self.baseline = baseline(self.fig,self.ax,menu=self.sub_menu,artists_global=self.artists,data_global=self.data)
-        self.integrate = integrate(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data)
-        self.peaks = peaks(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data)
+        self.baseline = baseline(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
+        self.fit = fit(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
+        self.int_peaks = int_peaks(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
+        self.labels = labels(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
+        self.display_tools = display_tools(self.fig,menu=self.sub_menu,artists_global=self.artists)
+        self.export = export(main_menu=self,menu=self.sub_menu,exp_path=exp_path)
+
+        # Widget list
+        self.widgets = {
+        'baseline':self.baseline,
+        'fit':self.fit,
+        'int_peaks':self.int_peaks,
+        'labels':self.labels,
+        'display_tools':self.display_tools,
+        'export':self.export
+        }
 
         # Setup the main menu and a blank sub_menu
         self.button_list = self.setup_buttons()
         self.place_menu(self.menu,self.button_list)
         self.place_menu(self.sub_menu,[])
+        self.fig_show(self.fig)
+        plt.show()
 
     # Define all main menu buttons and their functionality
     def setup_buttons(self):
@@ -58,17 +95,27 @@ class main_menu(widget_base):
         ##########################################
 
         # Add an on/off toggle to activate or deactive the widget
-        self.on_off_button = widgets.ToggleButton(description='Widget is On',value=True)
+        self.on_off_button = widgets.ToggleButton(description='On',value=True,layout = widgets.Layout(width='45px'))
 
         def on_on_off_button_clicked(b, self = self):
 
             # If the widget is on, turn it off
             if self.widget_on:
-                self.on_off_button.description = 'Widget is Off'
+                # Set the description
+                self.on_off_button.description = 'Off'
+                # Turn off the main widget
                 self.widget_on = False
+                # Turn off all buttons in the main menu
+                for tb in self.button_list:
+                    # Turn it off if except for the selected menu
+                    if tb != self.on_off_button: tb.value = False
+                # Clear the sub menu
+                self.place_menu(self.sub_menu,[])
+                # Deactivate the current active widget
+                if self.active_widget != self: self.active_widget.widget_on = False
             # If the widget is off, turn it on
             else:
-                self.on_off_button.description = 'Widget is On'
+                self.on_off_button.description = 'On'
                 self.widget_on = True
 
         self.on_off_button.observe(on_on_off_button_clicked)
@@ -82,6 +129,10 @@ class main_menu(widget_base):
             Generic button function for all new buttons
             '''
             def func(b,self=self):
+                if not self.widget_on:
+                    for tb in self.button_list:
+                        if tb != self.on_off_button: tb.value = False
+                    return
                 # If the widget is on, turn it off
                 if menuclass.widget_on:
                     # Turn off the widget
@@ -95,17 +146,19 @@ class main_menu(widget_base):
                 # If the widget is off, turn it on
                 else:
                     # For each button in the main menu
-                    for b in self.button_list:
+                    for tb in self.button_list:
                         # Turn it off if except for the selected menu
-                        if b != button and b != self.on_off_button: b.value = False
+                        if tb != button and tb != self.on_off_button: tb.value = False
                     # Turn on the selected menu
                     menuclass.widget_on = True
                     # Set the active widget to the selected menu
                     self.active_widget = menuclass
+                    # If moving to the export menu
+                    if self.active_widget == self.display_tools: self.display_tools.update(self.artists,None)
                     # Update the menu
                     self.prev_widget.update(self.artists,self.data)
                     # Turn off all the menu's buttons
-                    for b in menuclass.toggle_buttons: b.value = False
+                    for tb in menuclass.toggle_buttons: tb.value = False
                     # Place the buttons for the menu
                     self.place_menu(self.sub_menu,menuclass.button_list)
                     # Listen for a click
@@ -123,40 +176,38 @@ class main_menu(widget_base):
         ##########################################
 
         # Peaks toggle
-        self.peaks_button = widgets.ToggleButton(description='Peaks',value=False)
-        self.peaks_button.observe(menu_button(self,self.peaks,self.peaks_button), names=['value'])
+        self.int_peaks_button = widgets.ToggleButton(description='Integrate/Peaks',value=False)
+        self.int_peaks_button.observe(menu_button(self,self.int_peaks,self.int_peaks_button), names=['value'])
 
         # ##########################################
 
         # Integrate toggle
-        self.integrate_button = widgets.ToggleButton(description='Integrate',value=False)
-        self.integrate_button.observe(menu_button(self,self.integrate,self.integrate_button), names=['value'])
+        self.fit_button = widgets.ToggleButton(description='Fit',value=False)
+        self.fit_button.observe(menu_button(self,self.fit,self.fit_button), names=['value'])
+
+        # ##########################################
+
+        # Labels toggle
+        self.labels_button = widgets.ToggleButton(description='Labels',value=False)
+        self.labels_button.observe(menu_button(self,self.labels,self.labels_button), names=['value'])
 
         # ##########################################
         #
-        # # Figure toggle
-        # self.figure_button = widgets.ToggleButton(description='Figure',value=False)
-        # self.figure_button.observe(menu_button(self,self.figure,self.figure_button), names=['value'])
-        #
+        # Display toggle
+        self.display_tools_button = widgets.ToggleButton(description='Display',value=False)
+        self.display_tools_button.observe(menu_button(self,self.display_tools,self.display_tools_button), names=['value'])
+
         # ##########################################
         #
-        # # Labels toggle
-        # self.labels_button = widgets.ToggleButton(description='Labels',value=False)
-        # self.labels_button.observe(menu_button(self,self.labels,self.labels_button), names=['value'])
-        #
-        # ##########################################
-        #
-        # # Export toggle
-        # self.export_button = widgets.ToggleButton(description='Export',value=False)
-        # self.export_button.observe(menu_button(self,self.export,self.export_button), names=['value'])
+        # Export toggle
+        self.export_button = widgets.ToggleButton(description='Export',value=False)
+        self.export_button.observe(menu_button(self,self.export,self.export_button), names=['value'])
 
         ##########################################
         ## BUTTON LIST
         ##########################################
 
-        return [self.on_off_button,self.baseline_button,self.peaks_button,self.integrate_button]#,
-            # ,self.figure_button,
-            # self.labels_button,self.export_button]
+        return [self.on_off_button,self.baseline_button,self.int_peaks_button,self.fit_button,self.labels_button,self.display_tools_button,self.export_button]
 
     def setup_data(self,data):
         # Setup data
@@ -183,3 +234,43 @@ class main_menu(widget_base):
         self.bscolor = 'blue'
         self.fill_color = 'skyblue'
         self.marker = '*'
+
+    def data_tree(self):
+        self.active_widget.update(self.artists,self.data)
+        self.printdict(self.data)
+
+    def artist_tree(self):
+        self.active_widget.update(self.artists,self.data)
+        self.printdict(self.artists)
+
+    def get_data(self):
+        self.active_widget.update(self.artists,self.data)
+        return self.data
+
+    def get_artists(self):
+        self.active_widget.update(self.artists,self.data)
+        return self.artists
+
+    def export_dict(self):
+        self.active_widget.update(self.artists,self.data)
+        export = {
+        'artists_global': self.artists,
+        'data_global': self.data,
+        }
+        for key in self.widgets.keys():
+            if key == 'export' or key == 'display_tools':continue
+            w_export = {
+            'data': self.widgets[key].get_data(),
+            'artists': self.widgets[key].get_artists(),
+            'style': self.widgets[key].style,
+            'info': self.widgets[key].info
+            }
+            export[key] = w_export
+
+        export['fig'] = self.fig
+
+        return export
+
+'''
+
+'''

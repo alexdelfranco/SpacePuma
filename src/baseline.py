@@ -7,15 +7,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
 import functools
-from scipy.interpolate import interp1d
 # import pickle
+
+from scipy.interpolate import interp1d
 
 from base import widget_base
 
 class baseline(widget_base):
     '''
     '''
-    def __init__(self,fig,main_ax,baseline_ax=None,menu=None,artists_global=None,data_global=None):
+    def __init__(self,fig,baseline_ax=None,menu=None,artists_global=None,data_global=None,load=None):
         '''
         '''
         self.widget_on = False
@@ -27,10 +28,14 @@ class baseline(widget_base):
         # Initialize all global data
         self.data_global = self.pull_data(data_global)
         # Create a local artist dictionary
-        self.artists = {}
+        if load is None: self.artists = {}
+        else:
+            # If load is not None, subscript it to the load baseline dict
+            load = load['baseline']
+            self.artists = load['artists']
 
         # Create info and style dictionaries
-        self.style,self.info,self.data = self.setup_defaults()
+        self.style,self.info,self.data = self.setup_defaults(load)
 
         # Initialize all buttons
         self.button_list,self.toggle_buttons = self.setup_buttons()
@@ -41,7 +46,11 @@ class baseline(widget_base):
         else: self.menu = menu
 
     # Define dictionaries of default values
-    def setup_defaults(self):
+    def setup_defaults(self,load=None):
+
+        if load is not None:
+            load['info']['interactive_mode'] = 'off'
+            return load['style'],load['info'],load['data']
 
         style = {
         'marker':'*',
@@ -72,17 +81,6 @@ class baseline(widget_base):
         data = dict.fromkeys(self.artists_global['Interactive Axes'],self.data_init())
 
         return style,info,data
-
-    def data_init(self):
-        return {
-            'Baseline':{
-                # Fit points
-                'Baseline Points': {'xdata':[],'ydata':[]},
-                'Baseline': {'xdata':[],'ydata':[]},
-                'Baseline Subtracted Data': {'xdata':[],'ydata':[]},
-                'Baseline Axis':None
-                }
-        }
 
     # Define all buttons and their functionality
     def setup_buttons(self):
@@ -183,7 +181,7 @@ class baseline(widget_base):
         #####################
 
         # Add a button widget to clear all points
-        self.clear_button = widgets.ToggleButton(description='Clear All')
+        self.clear_button = widgets.ToggleButton(description='Clear Plot')
 
         def on_clear_button_clicked(b, self = self):
 
@@ -203,6 +201,10 @@ class baseline(widget_base):
         return [self.add_button,self.move_button,self.delete_button,self.fit_type_select,self.clear_button], \
         [self.add_button,self.move_button,self.delete_button,self.clear_button]
 
+    ##########################################
+    ## UPDATE METHODS
+    ##########################################
+
     # Initialize Artists
     def new_artists(self,ax,style):
 
@@ -219,6 +221,21 @@ class baseline(widget_base):
         'Baseline Func': plotfit
         }
         return artists
+
+    def data_init(self):
+        return {
+            'Baseline':{
+                # Fit points
+                'Baseline Points': {'xdata':[],'ydata':[]},
+                'Baseline': {'xdata':[],'ydata':[]},
+                'Baseline Subtracted Data': {'xdata':[],'ydata':[]},
+                'Baseline Axis':None
+                }
+        }
+
+    ##########################################
+    ## EVENT HANDLER
+    ##########################################
 
     # When the class is called as a function
     def __call__(self,event):
@@ -343,7 +360,6 @@ class baseline(widget_base):
 
         # If the clear button has been pressed
         elif self.info['interactive_mode'] == 'clear':
-            self.test2 = 0
             self.axis_clear(ax)
 
         ##########################################
@@ -352,6 +368,7 @@ class baseline(widget_base):
 
         # If there is a fit, update it
         self.fit(ax)
+        plt.show()
 
     ##########################################
     ## FITTING METHODS
@@ -362,7 +379,7 @@ class baseline(widget_base):
         # If there is only one point, don't fit
         if len(self.data[ax]['Baseline']['Baseline Points']['xdata']) < 2: return
         # Fit the baseline points depending using the specified function
-        if self.info['fit_type'] == 'Polynomial': self.pfit()
+        if self.info['fit_type'] == 'Polynomial': self.pfit(ax)
         elif self.info['fit_type'] == 'Linear Segment': self.lsfit(ax)
         # Setup baseline if not already setup
         if self.data[ax]['Baseline']['Baseline Axis'] is None:
@@ -389,11 +406,11 @@ class baseline(widget_base):
         # If a fit order override is specified, override the fit order
         if self.info['fit_order_override'] != 0: self.fit_order = self.info['fit_order_override']
         # Calculate a polynomial fit
-        z = np.polyfit(self.data[ax]['Baseline']['Baseline Points']['xdata'], ['Baseline']['Baseline Points']['ydata'], self.fit_order)
+        z = np.polyfit(self.data[ax]['Baseline']['Baseline Points']['xdata'],self.data[ax]['Baseline']['Baseline Points']['ydata'], self.fit_order)
         self.fitfunc = np.poly1d(z)
 
         # Calculate the fit arrays
-        xnew = np.linspace(ax.get_xlim()[0],ax.get_xlim()[0],200)
+        xnew = np.linspace(ax.get_xlim()[0],ax.get_xlim()[1],200)
         ynew = self.fitfunc(xnew)
 
         # Save the baseline
@@ -405,50 +422,44 @@ class baseline(widget_base):
         # Make sure the fit degree is visually up to date
         self.fit_order_inttext.value = self.fit_order
 
-        return(xnew,ynew)
-
     # Linear segmented fit function
     def lsfit(self,ax):
         # Calculate ordered copies of xdat and ydat
         xord,yord = self.order(self.data[ax]['Baseline']['Baseline Points']['xdata'],self.data[ax]['Baseline']['Baseline Points']['ydata'])
         # Create the fitting function
         self.fitfunc = interp1d(xord,yord)
+
         # Create x and y data using the fitting function
-        x2 = np.linspace(np.min(xord),np.max(xord),500)
-        y2 = self.fitfunc(x2)
+        xnew = np.linspace(np.min(xord),np.max(xord),500)
+        ynew = self.fitfunc(xnew)
 
         # Save the baseline
-        self.data[ax]['Baseline']['Baseline']['xdata'] = x2
-        self.data[ax]['Baseline']['Baseline']['ydata'] = y2
+        self.data[ax]['Baseline']['Baseline']['xdata'] = xnew
+        self.data[ax]['Baseline']['Baseline']['ydata'] = ynew
         # Plot the fit
-        self.artists[ax]['Baseline Func'].set_data([x2,y2])
+        self.artists[ax]['Baseline Func'].set_data([xnew,ynew])
 
     # Baseline method
     def baseline_plot(self,ax):
         # Subset the x range to what is visible
         xord,yord = self.order(self.data[ax]['Baseline']['Baseline Points']['xdata'],self.data[ax]['Baseline']['Baseline Points']['ydata'])
         # Subset the science data with the range defined by the fit
-        # self.test = 2
         bsx,bsy = self.artists_global[ax][self.artists_global['Primary Artists'][ax]].get_data()
         ii = np.squeeze(np.where((bsx > xord[0]) & (bsx < xord[-1])))
-        # self.test = 3
         # Redefine the baseline vars as their relevant subsets
         bsx,bsy = bsx[ii],bsy[ii]
         # Calculate the fit using the baseline x data
         bs_fity = self.fitfunc(bsx)
-        # self.test = 4
         # Save the baseline-subtracted data
         self.data[ax]['Baseline']['Baseline Subtracted Data']['xdata'] = bsx
         self.data[ax]['Baseline']['Baseline Subtracted Data']['ydata'] = bsy - bs_fity
         # Show the residual plot
-        # self.test = 6
         self.artists[self.data[ax]['Baseline']['Baseline Axis']]['Baselined Data'].set_data([bsx, bsy - bs_fity])
         # Autoscale the y axis correspondingly
         self.data[ax]['Baseline']['Baseline Axis'].relim()
         self.data[ax]['Baseline']['Baseline Axis'].autoscale()
 
     def axis_clear(self,ax):
-        self.test2 +=1
         # If there is a baseline axis that was generated from this one
         if self.data[ax]['Baseline']['Baseline Axis'] is not None:
             # Recursively clear it
