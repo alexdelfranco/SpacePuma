@@ -1,4 +1,4 @@
-name: base
+name: astrochem-tools 
 channels:
   - conda-forge
 dependencies:

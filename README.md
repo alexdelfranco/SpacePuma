@@ -69,7 +69,7 @@ jupyter notebook
 
 Happy coding!
 
-N.B. These tools were originally developed for the Öberg Astrochemistry Group.
+*N.B. These tools were originally developed for the Öberg Astrochemistry Group.*
 
 
 
