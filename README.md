@@ -1,7 +1,5 @@
 # AstroChem Tools
 
-Tools developed for the Öberg Astrochemistry Group
-
 The tools included are aimed at increasing the expediancy of data analysis and reduction within the fields of chemistry and astro-chemistry. Tutorial notebooks are included within the Tutorials directory. For detailed instructions on how to modify or add to the tools, check our documentation page [here]().
 
 ## Installation
@@ -45,6 +43,7 @@ Either of these deactivation methods are far superior to ```conda deactivate``` 
 pip3 install pipenv
 # Alternatively, if on MacOS, you can use HomeBrew
 brew install pipenv
+
 # From inside the repository, activate the environment shell
 pipenv shell
 ```
@@ -69,3 +68,8 @@ jupyter notebook
 ```
 
 Happy coding!
+
+N.B. These tools were originally developed for the Öberg Astrochemistry Group.
+
+
+
