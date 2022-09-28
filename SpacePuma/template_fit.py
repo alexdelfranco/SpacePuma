@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import copy as cp
 
-from fit_methods import fit_methods
+from .fit_methods import fit_methods
 
 class fit(fit_methods):
     def __init__(self,fit_module):

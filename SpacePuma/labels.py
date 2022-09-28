@@ -10,7 +10,7 @@ import functools
 
 import seaborn as sns
 
-from base import widget_base
+from .base import widget_base
 
 class labels(widget_base):
     def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load=None):

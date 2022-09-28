@@ -12,10 +12,10 @@ from scipy.optimize import curve_fit
 import seaborn as sns
 import copy as cp
 
-from base import widget_base
-from fit_methods import fit_methods
+from .base import widget_base
+from .fit_methods import fit_methods
 
-import gaussian_fit
+import .gaussian_fit
 
 class fit(widget_base,fit_methods):
 

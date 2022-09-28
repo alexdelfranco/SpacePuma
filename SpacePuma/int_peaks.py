@@ -12,7 +12,7 @@ from scipy.signal import find_peaks,medfilt
 from scipy.integrate import simps
 import seaborn as sns
 
-from base import widget_base
+from .base import widget_base
 
 class int_peaks(widget_base):
     def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load=None):

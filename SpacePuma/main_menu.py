@@ -10,14 +10,13 @@ import ipywidgets as widgets
 import copy as cp
 import pickle as pkl
 
-import importlib as imp
-from base import widget_base
-from baseline import baseline
-from fit import fit
-from int_peaks import int_peaks
-from labels import labels
-from display_tools import display_tools
-from export import export
+from .base import widget_base
+from .baseline import baseline
+from .fit import fit
+from .int_peaks import int_peaks
+from .labels import labels
+from .display_tools import display_tools
+from .export import export
 
 from scipy import integrate as scpyintegrate
 import functools
