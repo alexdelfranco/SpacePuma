@@ -10,11 +10,19 @@ import functools
 
 from scipy.optimize import curve_fit
 import seaborn as sns
+import copy as cp
 
 from base import widget_base
+from fit_methods import fit_methods
 
-class fit(widget_base):
-    def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load=None):
+import gaussian_fit
+
+class fit(widget_base,fit_methods):
+
+    def fits(self):
+        gaussian_fit.fit(self)
+
+    def __init__(self,fig,menu=None,param_menu=None,data=None,artists_global=None,data_global=None,load=None):
         '''
         '''
         self.widget_on = False
@@ -35,13 +43,20 @@ class fit(widget_base):
         # Initialize defaults
         self.style,self.info,self.data = self.setup_defaults(load)
 
+        # Setup the fits
+        self.fits()
+
         # Initialize all buttons
-        self.button_list,self.toggle_buttons = self.setup_buttons()
+        self.button_list,self.toggle_buttons,self.param_button_list = self.setup_buttons()
         # Place all the menu buttons
         if menu is None:
             self.menu = widgets.HBox()
             self.place_menu(self.menu,self.button_list)
         else: self.menu = menu
+        if param_menu is None:
+            self.param_menu = widgets.HBox()
+            self.place_menu(self.param_menu,self.param_button_list)
+        else: self.param_menu = param_menu
 
     def setup_defaults(self,load=None):
 
@@ -65,8 +80,16 @@ class fit(widget_base):
         'selected':False,
         # Set an interactive click distance
         'click_dist':0.02,
+        # Initialize a list of fit types
+        'fit_dict':{},
+        # Initialize a parameter:
+        'parameter':'',
         # Initialize a fit type
-        'fit_type':'Gaussian',
+        'fit_type':'None',
+        # Initialize a parameters dict
+        'fit_params':{},
+
+        ##### TO BE REMOVED
         # Initialize a fit order
         'fit_order':1,
         # Initialize a fit std range
@@ -76,6 +99,16 @@ class fit(widget_base):
         data = dict.fromkeys(self.artists_global['Interactive Axes'],self.data_init())
 
         return style,info,data
+
+    def setup_parameters(self,params):
+        param_dict = {}
+        for param in params:
+            param_dict[param] = {
+            'Estimate':0,
+            'Lower Bound':0,
+            'Upper Bound':0
+            }
+        return param_dict
 
     def setup_buttons(self):
 
@@ -120,24 +153,105 @@ class fit(widget_base):
         #####################
 
         # Add a selector widget to change the fit type
-        self.fit_type_select = widgets.Select(description='Fit:',options=['Gaussian','Skew Gaussian'],rows=0,style={'description_width':'initial'},layout = widgets.Layout(width='200px'))
+        self.fit_type_select = widgets.Select(description='Fit:',options=list(np.concatenate([['None'],list(self.info['fit_dict'].keys())])),rows=0,style={'description_width':'initial'},layout = widgets.Layout(width='200px'))
 
         def fit_type_select_clicked(b, self = self):
 
-            self.info['Fit Type'] = self.fity_type_select.value
+            self.info['fit_type'] = self.fit_type_select.value
+
+            if self.fit_type_select.value == 'None':
+                # Clear the parameter menu
+                self.place_menu(self.param_menu,[])
+                return
+
+            if len(self.info['fit_params'].keys()) > 0:
+                # Display the paramter menu
+                self.place_menu(self.param_menu,self.param_button_list)
+                self.info['parameter'] = self.parameter_select.value
 
         self.fit_type_select.observe(functools.partial(fit_type_select_clicked, self=self))
 
         #####################
 
         # Add an integer text widget to change the fit order
-        self.fit_order_inttext = widgets.IntText(description='Fit Order:',value=1,style={'description_width':'initial'},layout = widgets.Layout(width='100px'))
+        self.fit_order_inttext = widgets.IntText(description='Order:',value=1,style={'description_width':'initial'},layout = widgets.Layout(width='95px'))
 
         def fit_order_inttext_clicked(b, self = self):
 
+            # Save the fit order
             self.info['fit_order'] = self.fit_order_inttext.value
+            # Retrieve the fit module
+            fit_module = self.info['fit_dict'][self.info['fit_type']]
+            # Set the fit order in the module
+            fit_module.fit_order = self.info['fit_order']
+            # Recalculate the parameters
+            fit_module.parameters = fit_module.get_params(self.info['fit_params'])
 
         self.fit_order_inttext.observe(functools.partial(fit_order_inttext_clicked, self=self))
+
+        #####################
+
+        # Add a selector widget to change the input paramters
+        self.parameter_select = widgets.Select(description='Paramters:',options=list(self.info['fit_params'].keys()),rows=0,style={'description_width':'initial'},layout = widgets.Layout(width='200px'))
+
+        def parameter_select_clicked(b, self = self):
+
+            self.info['parameter'] = self.parameter_select.value
+
+            # Retrieve the current values of the fit parameters
+            self.estimate_inttext.value = self.info['fit_params'][self.info['parameter']]['Estimate']
+            self.lower_bound_inttext.value = self.info['fit_params'][self.info['parameter']]['Lower Bound']
+            self.upper_bound_inttext.value = self.info['fit_params'][self.info['parameter']]['Upper Bound']
+
+        self.parameter_select.observe(functools.partial(parameter_select_clicked, self=self))
+
+        #####################
+
+        # Add an integer text widget to set a paramter estimate
+        self.estimate_inttext = widgets.IntText(description='Estimate:',value=5,style={'description_width':'initial'},layout = widgets.Layout(width='120px'))
+
+        def estimate_inttext_clicked(b, self = self):
+
+            # Save the fit parameter
+            self.info['fit_params'][self.info['parameter']]['Estimate'] = cp.deepcopy(self.estimate_inttext.value)
+            # Retrieve the fit module
+            fit_module = self.info['fit_dict'][self.info['fit_type']]
+            # Recalculate the parameters
+            fit_module.parameters = fit_module.get_params(self.info['fit_params'])
+
+        self.estimate_inttext.observe(functools.partial(estimate_inttext_clicked, self=self))
+
+        #####################
+
+        # Add an integer text widget to set the lower paramter bound
+        self.lower_bound_inttext = widgets.IntText(description='Lower Bound:',value=0,style={'description_width':'initial'},layout = widgets.Layout(width='150px'))
+
+        def lower_bound_inttext_clicked(b, self = self):
+
+            # Save the fit parameter
+            self.info['fit_params'][self.info['parameter']]['Lower Bound'] = cp.deepcopy(self.lower_bound_inttext.value)
+            # Retrieve the fit module
+            fit_module = self.info['fit_dict'][self.info['fit_type']]
+            # Recalculate the parameters
+            fit_module.parameters = fit_module.get_params(self.info['fit_params'])
+
+        self.lower_bound_inttext.observe(functools.partial(lower_bound_inttext_clicked, self=self))
+
+        #####################
+
+        # Add an integer text widget to set the upper paramter bound
+        self.upper_bound_inttext = widgets.IntText(description='Upper Bound:',value=10,style={'description_width':'initial'},layout = widgets.Layout(width='150px'))
+
+        def upper_bound_inttext_clicked(b, self = self):
+
+            # Save the fit parameter
+            self.info['fit_params'][self.info['parameter']]['Upper Bound'] = cp.deepcopy(self.upper_bound_inttext.value)
+            # Retrieve the fit module
+            fit_module = self.info['fit_dict'][self.info['fit_type']]
+            # Recalculate the parameters
+            fit_module.parameters = fit_module.get_params(self.info['fit_params'])
+
+        self.upper_bound_inttext.observe(functools.partial(upper_bound_inttext_clicked, self=self))
 
         #####################
 
@@ -177,7 +291,9 @@ class fit(widget_base):
 
         #####################
 
-        return [self.add_range_button,self.adjust_range_button,self.fit_type_select,self.fit_order_inttext,self.fit_button,self.clear_axis_button],[self.add_range_button,self.adjust_range_button,self.fit_button,self.clear_axis_button]
+        return ([self.add_range_button,self.adjust_range_button,self.fit_type_select,self.fit_button,self.clear_axis_button],
+                    [self.add_range_button,self.adjust_range_button,self.fit_button,self.clear_axis_button],
+                    [self.parameter_select,self.estimate_inttext,self.lower_bound_inttext,self.upper_bound_inttext,self.fit_order_inttext])
 
     ##########################################
     ## UPDATE METHODS
@@ -198,7 +314,7 @@ class fit(widget_base):
     def data_init(self):
         return {
         'Range':[],
-        'Fit':{'Line 1':{'xdata':[],'ydata':[]},'Axis':[]}
+        'Fit':{'Axis':[]}
         }
 
     ##########################################
@@ -310,45 +426,10 @@ class fit(widget_base):
             # Only fit if there are two boundaries
             if len(self.data[ax]['Range']) < 2: return
 
-            # Add an axis to the figure
-            self.resize_figure(len(self.fig.axes)+1,self.fig)
-            # Save that axis
-            fit_ax = self.fig.axes[-1]
-            self.data[ax]['Fit']['Axis'].append(fit_ax)
-
-            # Add a plot on which to display the fit
-            self.artists[fit_ax] = {}
-            # Define an array of hex colors
-            colors = sns.color_palette(self.style['color_palette']).as_hex()
-
-            # Create a data dictionary for the new axis
-            self.data[fit_ax] = {
-            'Range': self.data[ax]['Range'],
-            'Data Axis':ax,
-            'Stats': {},
-            'Fit Line':{'xdata':[],'ydata':[]},
-            'Fit Number': 1
-            }
-
-            # Determine the primary curve for the current axis
-            curve = self.artists_global['Primary Artists'][ax]
-            # Separate the xdata values
-            xdata = self.artists_global[ax][curve].get_data()[0]
-
-            #######
-            model = self.ngaussian_model; gnumber = self.info['fit_order']
-
-            # Fit n gaussians to the primary data on the selected plot
-            self.data[fit_ax]['Stats'] = self.calc_fit(ax,model,gnumber)
-
-            popt = self.data[fit_ax]['Stats']['popt']
-            if self.info['fit_type'] == 'Gaussian': self.plot_gaussian_fit(xdata,popt,colors,ax,fit_ax)
-
-            fit_ax.legend()
-            ax.legend()
-
-            # Set the primary figure artist to the Fit Line
-            self.artists_global['Primary Artists'][fit_ax] = 'Fit Line'
+            if self.info['fit_type'] is not None:
+                ## Import functions from a module
+                imported_fit = self.info['fit_dict'][self.info['fit_type']]
+                self.fit(imported_fit,ax,new_ax=imported_fit.new_ax)
 
         ##########################################
         ## CLEAR AXIS
@@ -402,7 +483,6 @@ class fit(widget_base):
                 # Clear artists on parent plot
                 for artist in list(self.artists[self.data[ax]['Data Axis']].keys()):
                     if artist == f"Fit Line {self.data[ax]['Fit Number']}":
-                        self.test = artist
                         # Clear line data
                         self.artists[self.data[ax]['Data Axis']][artist].set_data([],[])
                         del self.artists[self.data[ax]['Data Axis']][artist]
@@ -439,153 +519,27 @@ class fit(widget_base):
         plt.show()
 
     ##########################################
-    ## FITTING METHODS
+    ## ACTIVATE AND DEACTIVATE
     ##########################################
 
-    def calc_fit(self,ax,model,gnumber):
+    # Overwrite the deactivation method called when the widget is turned off
+    def activate(self):
+        # Set the widget to the off setting
+        self.widget_on = True
+        # Display the widget menu
+        self.place_menu(self.menu,self.button_list)
+        # # Display the paramter menu
+        # self.place_menu(self.param_menu,self.param_button_list)
+        # Return the widget toggle
+        return self.widget_on
 
-        # Determine the primary curve for the current axis
-        curve = self.artists_global['Primary Artists'][ax]
-        # Pull out the x and y data from that curve
-        xdata,ydata = self.artists_global[ax][curve].get_data()
-        # Determine the range of the fit
-        xmin,xmax = sorted(self.data[ax]['Range'])
-        # Determine the max y value of the fit
-        ymax = np.max(ydata)
-
-        # # Retrieve the fit order
-        # gnumber = self.info['fit_order']
-        # Determine the input parameters and bounds
-        p0,bounds = self.get_params(xmin,xmax,ymax,gnumber)
-
-        # Determine the indices of the data values within the range
-        ii = np.squeeze(np.where((xdata > xmin) & (xdata < xmax)))
-        # Define subsets of the data arrays
-        xsub,ysub = xdata[ii],ydata[ii]
-
-        # Fit a curve
-        popt,pcov = curve_fit(model, xsub, ysub, p0=p0, bounds=bounds)
-
-        ## Fit products
-
-        # Create a fit from the xdata and fitted parameters
-        simdat = model(xdata,*popt)
-
-        # pcov is a matrix with values related to the errors of the fit.
-        # To get the actual errors of the Gaussian parameters one needs to calculate the square root of the values in the diagonal
-
-        # Calculate the errors of the fit
-        perr = np.sqrt(np.diag(pcov))
-
-        # Save the relevant statistics
-        stats = {
-        'popt':popt,'perr':perr,
-        'xsub':xsub,'ysub':ysub,
-        'simdat':simdat
-        }
-
-        stats = self.add_fit_stats(stats,gnumber)
-
-        return(stats)
-
-    def plot_gaussian_fit(self,xdata,popt,colors,ax,fit_ax):
-        # Initialize a line number
-        fnum = 1
-        # Determine which fit this is
-        for key in self.artists[ax].keys():
-            if 'Fit Line' in key: fnum += 1
-        if fnum != 1: self.data[fit_ax]['Fit Number'] = fnum
-
-        # Save the Fit Line data to the original axis
-        self.data[ax]['Fit'][f'Line {fnum}'] = {'xdata':[],'ydata':[]}
-        self.data[ax]['Fit'][f'Line {fnum}']['xdata'] = xdata
-        self.data[ax]['Fit'][f'Line {fnum}']['ydata'] = self.data[fit_ax]['Stats']['simdat']
-        # Save the Fit Line data to the original axis
-        self.data[fit_ax]['Fit Line']['xdata'] = xdata
-        self.data[fit_ax]['Fit Line']['ydata'] = self.data[fit_ax]['Stats']['simdat']
-        # Create a total area variable
-        total_area = 0
-        # Loop through each fit gaussian and save and plot it
-        for ii in np.arange(self.info['fit_order']):
-            self.data[fit_ax][f'Fit {ii+1}'] = {'xdata':[],'ydata':[]}
-            self.data[fit_ax][f'Fit {ii+1}']['xdata'] = xdata
-            self.data[fit_ax][f'Fit {ii+1}']['ydata'] = self.gaussian(xdata, popt[3*ii], popt[3*ii + 1], popt[3*ii + 2])
-            # Calculate the area
-            area = self.data[fit_ax]['Stats']['area'][f'fit{ii+1}']
-            # Add the area to the total area
-            total_area += area
-            err = self.data[fit_ax]['Stats']['area_err'][f'fit{ii+1}_err']
-            self.artists[fit_ax][f'Fit {ii+1}'] = fit_ax.fill_between(self.data[fit_ax][f'Fit {ii+1}']['xdata'],self.data[fit_ax][f'Fit {ii+1}']['ydata'],label=f'Fit {ii+1} - Area: {round(area,3)}, Error: {round(err,3)}',color = colors[ii%6], lw = 1,alpha=0.6)
-
-            # Plot the fit line
-            self.artists[ax][f'Fit Line {fnum}'] = ax.plot(self.data[ax]['Fit'][f'Line {fnum}']['xdata'],self.data[ax]['Fit'][f'Line {fnum}']['ydata'],label=f'Area: {round(total_area,3)}',lw=2,alpha=0.6,color='red')[0]
-
-    ##########################################
-    ## THE MODEL
-    ##########################################
-
-    def gaussian(self,xx,sigma,a,mu):
-        # A gaussian function used for curve fitting
-        exp = -(1/2) * ((xx-mu)/sigma) ** 2
-        return np.array(a * np.exp(exp))
-
-    # Define an n gaussian model
-    def ngaussian_model(self,xx,*params):
-        y = np.zeros_like(xx)
-        for i in range(0,len(params),3):
-            y = np.add(y, self.gaussian(xx,params[i],params[i+1],params[i+2]), casting="unsafe")
-        # return(y + yoff + slope * (xx-xoff))
-        return y
-
-    ##########################################
-    ## PARAMETERS
-    ##########################################
-
-    # Method to determine guess parameters and bounds
-    def get_params(self,xmin,xmax,ymax,gnum=1):
-        #Set initial parameters and bounds
-
-        xavg = (xmin+xmax)/2
-        std_max = self.info['std_max']
-
-        p0,bound1,bound2 = [],[],[]
-
-        #             std        a        mu
-        p0_fit   =  [ std_max/2, ymax,  xavg ]   # GUESSES
-        bnd_fit1 =  [ 0,         1e-6,    xmin ]  # LOWER BOUNDS
-        bnd_fit2 =  [ std_max,   ymax*2, xmax ]  # UPPER BOUNDS
-
-        # Combine the separate parameter arrays
-        for i in range(gnum):
-            p0 = np.concatenate((p0,p0_fit))
-            bound1 = np.concatenate((bound1,bnd_fit1))
-            bound2 = np.concatenate((bound2,bnd_fit2))
-        bounds = np.concatenate(([bound1],[bound2]),axis=0)
-
-        # Return the initial parameter guesses and bounds
-        return(p0,bounds)
-
-    ##########################################
-    ## STATS
-    ##########################################
-
-    # Method to return stats about a certain fit
-    def add_fit_stats(self,stats,gnum):
-
-        area,area_err,fwhm,fwhm_err = {},{},{},{}
-        popt,perr = stats['popt'],stats['perr']
-
-        # Calculate the area of a Gaussian (for example, if you want to calculate the column density)
-        for i in range(0,gnum):
-            # area of the first Gaussian: area = sqrt(2pi)*width*amp
-            area[f'fit{i+1}'] = np.sqrt(2*np.pi)*popt[i*3]*popt[i*3 + 1]
-            # error of the area of the first Gaussian calculated from the errors in the Gaussian parameters
-            area_err[f'fit{i+1}_err'] = area[f'fit{i+1}'] * np.sqrt((perr[i*3]/popt[i*3])**2 + (perr[i*3 + 1]/popt[i*3 + 1])**2)
-
-            # The FWHM (full width half maximum) of the Gaussian can be calculated from the width parameter of the Gaussian
-            fwhm[f'fit{i+1}'] = 2.35482 * popt[3*i]
-            fwhm_err[f'fit{i+1}_err'] = 2.35482 * perr[3*i]
-
-        stats['area'],stats['area_err'],stats['fwhm'],stats['fwhm_err'] = area,area_err,fwhm,fwhm_err
-
-        return(stats)
+    # Overwrite the deactivation method called when the widget is turned off
+    def deactivate(self,main=False):
+        # Deactivate the widget
+        self.widget_on = False
+        # Clear the widget menu
+        self.place_menu(self.menu,[])
+        # Clear the paramter menu
+        self.place_menu(self.param_menu,[])
+        # Return the widget toggle
+        return self.widget_on

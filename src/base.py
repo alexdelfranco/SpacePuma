@@ -271,19 +271,62 @@ class widget_base:
         # Set the figure canvas to the manager's canvas
         fig.set_canvas(manager.canvas)
 
+# ADMIN METHODS
+
+    def activate(self):
+        # Activate the widget
+        self.widget_on = True
+        self.place_menu(self.menu,self.button_list)
+        # Return the widget toggle
+        return self.widget_on
+
+    def deactivate(self,main=False):
+        # Deactivate the widget
+        self.widget_on = False
+        # If not the main menu
+        if not main:
+            # Clear the widget menu
+            self.place_menu(self.menu,[])
+        # Return the widget toggle
+        return self.widget_on
+
 # PRINT AND RETURN METHODS
 
-    def data_tree(self):
-        self.printdict(self.data)
+    def data_tree(self,*kwargs):
+        ddict = self.get_data()
+        for arg in kwargs:
+            if arg in ddict.keys():
+                ddict = ddict[arg]
+        self.printdict(ddict)
 
-    def artist_tree(self):
-        self.printdict(self.artists)
+    def artist_tree(self,*kwargs):
+        adict = self.get_artists()
+        for arg in kwargs:
+            if arg in adict.keys():
+                adict = adict[arg]
+        self.printdict(adict)
 
     def get_data(self):
-        return self.data
+        # Get the list of axes
+        axes = self.get_axes()
+        # Create a new data dictionary for data export
+        exp_data = {}
+        # Fill the new dictionary
+        for ind,ax in enumerate(axes):
+            exp_data[f'Axis {ind+1}'] = self.data[ax]
+        # Return the export dictionary
+        return exp_data
 
     def get_artists(self):
-        return self.artists
+        # Get the list of axes
+        axes = self.get_axes()
+        # Create a new data dictionary for data export
+        exp_artists = {}
+        # Fill the new dictionary
+        for ind,ax in enumerate(axes):
+            exp_artists[f'Axis {ind+1}'] = self.artists[ax]
+        # Return the export dictionary
+        return exp_artists
 
     def get_fig(self):
         return self.fig

@@ -34,7 +34,7 @@ class main_menu(widget_base):
         self.widget_on = True
         self.active_widget = self
         self.prev_widget = self
-        self.menu,self.sub_menu = widgets.HBox(),widgets.HBox()
+        self.menu,self.sub_menu,self.info_menu = widgets.HBox(),widgets.HBox(),widgets.HBox()
 
         # Check for an load dictionary
         if load_file is not None:
@@ -64,7 +64,7 @@ class main_menu(widget_base):
 
         # Initialize all sub_menus
         self.baseline = baseline(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
-        self.fit = fit(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
+        self.fit = fit(self.fig,menu=self.sub_menu,param_menu=self.info_menu,artists_global=self.artists,data_global=self.data,load=load)
         self.int_peaks = int_peaks(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
         self.labels = labels(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
         self.display_tools = display_tools(self.fig,menu=self.sub_menu,artists_global=self.artists)
@@ -84,6 +84,7 @@ class main_menu(widget_base):
         self.button_list = self.setup_buttons()
         self.place_menu(self.menu,self.button_list)
         self.place_menu(self.sub_menu,[])
+        self.place_menu(self.info_menu,[])
         self.fig_show(self.fig)
         plt.show()
 
@@ -104,19 +105,17 @@ class main_menu(widget_base):
                 # Set the description
                 self.on_off_button.description = 'Off'
                 # Turn off the main widget
-                self.widget_on = False
+                self.deactivate(main=True)
                 # Turn off all buttons in the main menu
                 for tb in self.button_list:
                     # Turn it off if except for the selected menu
                     if tb != self.on_off_button: tb.value = False
-                # Clear the sub menu
-                self.place_menu(self.sub_menu,[])
                 # Deactivate the current active widget
-                if self.active_widget != self: self.active_widget.widget_on = False
+                if self.active_widget != self: self.active_widget.deactivate()
             # If the widget is off, turn it on
             else:
                 self.on_off_button.description = 'On'
-                self.widget_on = True
+                self.activate()
 
         self.on_off_button.observe(on_on_off_button_clicked)
 
@@ -136,21 +135,17 @@ class main_menu(widget_base):
                 # If the widget is on, turn it off
                 if menuclass.widget_on:
                     # Turn off the widget
-                    menuclass.widget_on = False
+                    menuclass.deactivate()
                     # Set the previous widget
                     self.prev_widget = menuclass
                     # Set the active widget to the main menu
                     self.active_widget = self
-                    # Remove the active sub_menu
-                    self.place_menu(self.sub_menu,[])
                 # If the widget is off, turn it on
                 else:
                     # For each button in the main menu
                     for tb in self.button_list:
                         # Turn it off if except for the selected menu
                         if tb != button and tb != self.on_off_button: tb.value = False
-                    # Turn on the selected menu
-                    menuclass.widget_on = True
                     # Set the active widget to the selected menu
                     self.active_widget = menuclass
                     # If moving to the export menu
@@ -159,8 +154,9 @@ class main_menu(widget_base):
                     self.prev_widget.update(self.artists,self.data)
                     # Turn off all the menu's buttons
                     for tb in menuclass.toggle_buttons: tb.value = False
-                    # Place the buttons for the menu
-                    self.place_menu(self.sub_menu,menuclass.button_list)
+                    # Turn on the selected menu
+                    menuclass.activate()
+
                     # Listen for a click
                     self.listen(menuclass)
             return func
@@ -235,21 +231,47 @@ class main_menu(widget_base):
         self.fill_color = 'skyblue'
         self.marker = '*'
 
-    def data_tree(self):
+    def data_tree(self,*kwargs):
         self.active_widget.update(self.artists,self.data)
-        self.printdict(self.data)
+        ddict = self.get_data()
+        for arg in kwargs:
+            if arg in ddict.keys():
+                ddict = ddict[arg]
+        self.printdict(ddict)
 
-    def artist_tree(self):
+    def artist_tree(self,*kwargs):
         self.active_widget.update(self.artists,self.data)
-        self.printdict(self.artists)
+        adict = self.get_artists()
+        for arg in kwargs:
+            if arg in adict.keys():
+                adict = adict[arg]
+        self.printdict(adict)
 
     def get_data(self):
+        # Update the data
         self.active_widget.update(self.artists,self.data)
-        return self.data
+        # Get the list of axes
+        axes = self.get_axes()
+        # Create a new data dictionary for data export
+        exp_data = {}
+        # Fill the new dictionary
+        for ind,ax in enumerate(axes):
+            exp_data[f'Axis {ind+1}'] = self.data[ax]
+        # Return the export dictionary
+        return exp_data
 
     def get_artists(self):
+        # Update the artists
         self.active_widget.update(self.artists,self.data)
-        return self.artists
+        # Get the list of axes
+        axes = self.get_axes()
+        # Create a new data dictionary for data export
+        exp_artists = {}
+        # Fill the new dictionary
+        for ind,ax in enumerate(axes):
+            exp_artists[f'Axis {ind+1}'] = self.artists[ax]
+        # Return the export dictionary
+        return exp_artists
 
     def export_dict(self):
         self.active_widget.update(self.artists,self.data)
