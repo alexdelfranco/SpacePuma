@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="SpacePuma",
-    version="0.13",
+    version="0.14",
     author="Alex DelFranco",
     author_email="adelfranco24@amherst.edu",
     description=("Interact with your data."),
