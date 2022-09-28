@@ -10,7 +10,7 @@ import ipywidgets as widgets
 import functools
 import pickle as pkl
 
-from base import widget_base
+from .base import widget_base
 
 class export(widget_base):
     def __init__(self,main_menu,menu=None,exp_path=None):

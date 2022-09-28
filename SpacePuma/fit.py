@@ -15,12 +15,12 @@ import copy as cp
 from .base import widget_base
 from .fit_methods import fit_methods
 
-import .gaussian_fit
+from .gaussian_fit import fit as gaussian_fit
 
 class fit(widget_base,fit_methods):
 
     def fits(self):
-        gaussian_fit.fit(self)
+        gaussian_fit(self)
 
     def __init__(self,fig,menu=None,param_menu=None,data=None,artists_global=None,data_global=None,load=None):
         '''

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import ipywidgets as widgets
 import functools
 
-from base import widget_base
+from .base import widget_base
 
 class display_tools(widget_base):
     def __init__(self,fig,menu=None,artists_global=None):
