@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="SpacePuma",
-    version="0.1",
+    version="0.11",
     author="Alex DelFranco",
     author_email="adelfranco24@amherst.edu",
     description=("Interact with your data."),
@@ -17,7 +17,7 @@ setup(
     install_requires=[
         "numpy",
         "scipy",
-        "jupyterlab,"
+        "jupyterlab",
         "matplotlib",
         "seaborn",
         "ipympl",
