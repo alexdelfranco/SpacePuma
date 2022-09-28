@@ -1,4 +1,4 @@
-# PUMA
+# Puma
 
 The tools included are aimed at increasing the expediancy of data analysis and reduction within the fields of chemistry and astro-chemistry. Tutorial notebooks are included within the Tutorials directory. For detailed instructions on how to modify or add to the tools, check our documentation page [here]().
 
