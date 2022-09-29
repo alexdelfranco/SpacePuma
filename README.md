@@ -1,6 +1,8 @@
 # SpacePuma
 
-```SpacePuma``` is an interactive extension to matplotlib designed for use within a jupyter environment. It was originally developed for the processing of astrochemical data but has demonstrated uses across a range of other data-handling fields. The extension combines a series of tools that allow for user input directly through a ```matplotlib```-powered GUI and indirectly through python. Data products, including figures, calculations, and data manipulations, can be exported to a python dictionary or saved through integration with ```pickle```. Customization of ```SpacePuma``` is possible and highly encouraged, with explanations of the necessary modifications covered in the tutorials. All the code is available publicly on GitHub. Tutorial notebooks are included within the Tutorials directory. For detailed instructions on how to modify or add to the tools, check our documentation page [here]().
+```SpacePuma``` is an interactive extension to matplotlib designed for use within a jupyter environment. It was originally developed for the processing of astrochemical data but has demonstrated uses across a range of other data-handling fields. The extension combines a series of tools that allow for user input directly through a ```matplotlib```-powered GUI and indirectly through python. Data products, including figures, calculations, and data manipulations, can be exported to a python dictionary or saved through integration with ```pickle```. 
+
+Customization of ```SpacePuma``` is possible and highly encouraged, with explanations of the necessary modifications covered in the tutorials. All the code is available publicly on GitHub. Tutorial notebooks are included within the Tutorials directory. For detailed instructions on how to modify or add to the tools, check our documentation page [here]().
 
 ## Installation
 
