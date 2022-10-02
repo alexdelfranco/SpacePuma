@@ -28,7 +28,7 @@ These tutorials should orient new users to the tools and provide a significant e
 
 Happy coding!
 
-*N.B. These tools were originally developed for the Öberg Astrochemistry Group.*
+*N.B. These tools were originally developed for the Öberg Astrochemistry Group. The name```SpacePuma``` was chosen following the space feline naming convention of the lab. It stands for: **Space Puma: Astrochemistry Code for Experiments Pertaining to the Understanding of More Astrochemisty***
 
 
 
