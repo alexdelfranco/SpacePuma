@@ -10,31 +10,33 @@ import functools
 
 from scipy.interpolate import interp1d
 
-from .base import widget_base
+from base import widget_base
 
 class baseline(widget_base):
     '''
     '''
-    def __init__(self,fig,baseline_ax=None,menu=None,artists_global=None,data_global=None,load=None):
+    def __init__(self,fig,menu=None,artists_global=None,data_global=None,load_data=None):
         '''
         '''
+        # Initialize the widget in the off position
         self.widget_on = False
+        # Set the display setting to display output
+        self.show = True
         # Setup the figure and axes
         self.fig = fig
+        # Setup possible load data
+        if load_data is not None:
+            if 'baseline' in load_data: load_data = load_data['baseline']
 
         # Initialize all global matplotlib artists
         self.artists_global = self.pull_artists(artists_global)
         # Initialize all global data
         self.data_global = self.pull_data(data_global)
         # Create a local artist dictionary
-        if load is None: self.artists = {}
-        else:
-            # If load is not None, subscript it to the load baseline dict
-            load = load['baseline']
-            self.artists = load['artists']
+        self.artists = {}
 
         # Create info and style dictionaries
-        self.style,self.info,self.data = self.setup_defaults(load)
+        self.style,self.info,self.data = self.setup_defaults(load_data)
 
         # Initialize all buttons
         self.button_list,self.toggle_buttons = self.setup_buttons()
@@ -44,12 +46,10 @@ class baseline(widget_base):
             self.place_menu(self.menu,self.button_list)
         else: self.menu = menu
 
-    # Define dictionaries of default values
-    def setup_defaults(self,load=None):
+        if load_data is not None: self.load(load_data)
 
-        if load is not None:
-            load['info']['interactive_mode'] = 'off'
-            return load['style'],load['info'],load['data']
+    # Define dictionaries of default values
+    def setup_defaults(self,load_data=None):
 
         style = {
         'marker':'*',
@@ -78,6 +78,13 @@ class baseline(widget_base):
         }
 
         data = dict.fromkeys(self.artists_global['Interactive Axes'],self.data_init())
+
+        if load_data is not None:
+            load_data['info']['interactive_mode'] = 'off'
+            load_data['info']['selected'] = False
+            load_data['info']['active_ax'] = None
+
+            return load_data['style'],load_data['info'],data
 
         return style,info,data
 
@@ -227,7 +234,7 @@ class baseline(widget_base):
                 # Fit points
                 'Baseline Points': {'xdata':[],'ydata':[]},
                 'Baseline': {'xdata':[],'ydata':[]},
-                'Baseline Subtracted Data': {'xdata':[],'ydata':[]},
+                'Corrected Data': {'xdata':[],'ydata':[]},
                 'Baseline Axis':None
                 }
         }
@@ -367,7 +374,7 @@ class baseline(widget_base):
 
         # If there is a fit, update it
         self.fit(ax)
-        plt.show()
+        if self.show: plt.show()
 
     ##########################################
     ## FITTING METHODS
@@ -428,8 +435,11 @@ class baseline(widget_base):
         # Create the fitting function
         self.fitfunc = interp1d(xord,yord)
 
+        # Get the length of the data array
+        bsx,_ = self.artists_global[ax][self.artists_global['Primary Artists'][ax]].get_data()
+        dat_length = len(np.squeeze(np.where((bsx > xord[0]) & (bsx < xord[-1]))))
         # Create x and y data using the fitting function
-        xnew = np.linspace(np.min(xord),np.max(xord),500)
+        xnew = np.linspace(np.min(xord),np.max(xord),dat_length)
         ynew = self.fitfunc(xnew)
 
         # Save the baseline
@@ -450,8 +460,8 @@ class baseline(widget_base):
         # Calculate the fit using the baseline x data
         bs_fity = self.fitfunc(bsx)
         # Save the baseline-subtracted data
-        self.data[ax]['Baseline']['Baseline Subtracted Data']['xdata'] = bsx
-        self.data[ax]['Baseline']['Baseline Subtracted Data']['ydata'] = bsy - bs_fity
+        self.data[ax]['Baseline']['Corrected Data']['xdata'] = bsx
+        self.data[ax]['Baseline']['Corrected Data']['ydata'] = bsy - bs_fity
         # Show the residual plot
         self.artists[self.data[ax]['Baseline']['Baseline Axis']]['Baselined Data'].set_data([bsx, bsy - bs_fity])
         # Autoscale the y axis correspondingly
@@ -492,3 +502,39 @@ class baseline(widget_base):
 
         # Clear data dictionary
         self.data[ax] = self.data_init()
+
+    ##########################################
+    ## LOAD METHODS
+    ##########################################
+
+    def load(self,load_data):
+
+        self.widget_on = True
+        self.show = False
+        self.info['interactive_mode'] = 'add'
+
+        class sim_event:
+            def __init__(self,xdata,ydata,axis):
+                self.xdata = xdata
+                self.ydata = ydata
+                self.inaxes = axis
+
+        for axnum,axis in enumerate(load_data['data']):
+        # Here axis will take on values of 'Axis 1', 'Axis 2', etc.
+
+            # If new axes have yet to be added, return
+            if axnum >= len(self.fig.axes): break
+
+            # Determine the axis on the new figure
+            ax = self.fig.axes[int(axis.split(' ')[-1])-1]
+
+            # Store the points which define the baseline
+            if 'Baseline' in load_data['data'][axis]:
+                baseline_pts = load_data['data'][axis]['Baseline']['Baseline Points']
+
+                # Call the baseline __call__ method to add the points with simulated events
+                [self(sim_event(xdata,ydata,ax)) for xdata,ydata in zip(baseline_pts['xdata'],baseline_pts['ydata'])]
+
+        self.widget_on = False
+        self.show = True
+        self.info['interactive_mode'] = 'off'

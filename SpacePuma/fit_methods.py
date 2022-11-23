@@ -5,6 +5,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 from scipy.optimize import curve_fit
 import seaborn as sns
@@ -78,7 +79,7 @@ class fit_methods():
     ## FITTING METHOD
     ##########################################
 
-    def fit(self,fit_struct,ax,new_ax=False):
+    def fit(self,fit_struct,ax,fit_info,new_ax=False):
 
         ##########################################
         ## PULL DATA
@@ -121,7 +122,7 @@ class fit_methods():
             self.artists_global['Primary Artists'][fit_ax] = 'Fit Line'
             # Create a data dictionary for the new axis
             self.data[fit_ax] = {
-            'Range': self.data[ax]['Range'],
+            'FitRange': self.data[ax]['FitRange'],
             'Data Axis':ax,
             'Fit Number': fit_number
             }
@@ -131,18 +132,15 @@ class fit_methods():
         ## FIT MODEL
         ##########################################
 
-        self.test = 29313
         # Fit n gaussians to the primary data on the selected plot
         stats = self.calculate_fit(ax,fit_struct.model,fit_struct.parameters)
 
-        self.test = 293
         # Add optional extra statistics
         stats = fit_struct.add_fit_stats(stats)
 
         self.test = stats
         self.data[ax]['Fit'][f'Fit {fit_number}'] = {'Stats':stats}
 
-        self.test = 29323523
         ##########################################
         ## PLOT THE MODEL
         ##########################################
@@ -150,8 +148,15 @@ class fit_methods():
         # Save the Fit Line data to the original axis
         self.data[ax]['Fit'][f'Fit {fit_number}']['Fit Line'] = {'xdata':xdata,'ydata':stats['simdat']}
 
+        # Save the fit type and range to the original axis
+        self.data[ax]['Fit'][f'Fit {fit_number}']['fit_type'] = fit_info['fit_type']
+        self.data[ax]['Fit'][f'Fit {fit_number}']['fit_params'] = deepcopy(fit_info['fit_params'])
+        self.data[ax]['Fit'][f'Fit {fit_number}']['fit_order'] = fit_info['fit_order']
+        self.data[ax]['Fit'][f'Fit {fit_number}']['FitRange'] = self.data[ax]['FitRange']
+
         # Plot the optimal parameters
         self.artists[ax][f'Fit Line {fit_number}'] = fit_struct.plot_fit(self,stats,fit_number,ax,fit_ax)[0]
+
 
     ##########################################
     ## THE MODEL FIT
@@ -168,7 +173,7 @@ class fit_methods():
         # Pull out the x and y data from that curve
         xdata,ydata = self.artists_global[ax][curve].get_data()
         # Determine the range of the fit
-        xmin,xmax = sorted(self.data[ax]['Range'])
+        xmin,xmax = sorted(self.data[ax]['FitRange'])
 
         p0,bounds = parameters
 

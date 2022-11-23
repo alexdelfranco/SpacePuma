@@ -13,26 +13,28 @@ import seaborn as sns
 from .base import widget_base
 
 class labels(widget_base):
-    def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load=None):
+    def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load_data=None):
         '''
         '''
+        # Initialize the widget in the off position
         self.widget_on = False
+        # Set the display setting to display output
+        self.show = True
         # Setup the figure
         self.fig = fig
+        # Setup possible load data
+        if load_data is not None:
+            if 'labels' in load_data: load_data = load_data['labels']
 
         # Initialize all global matplotlib artists
         self.artists_global = self.pull_artists(artists_global)
         # Initialize all global data
         self.data_global = self.pull_data(data_global)
         # Create a dictionary using the axes as keys
-        if load is None: self.artists = {}
-        else:
-            # If load is not None, subscript it to the load labels dict
-            load = load['labels']
-            self.artists = load['artists']
+        self.artists = {}
 
         # Initialize defaults
-        self.style,self.info,self.data = self.setup_defaults()
+        self.style,self.info,self.data = self.setup_defaults(load_data)
 
         # Initialize all buttons
         self.button_list,self.toggle_buttons = self.setup_buttons()
@@ -42,11 +44,9 @@ class labels(widget_base):
             self.place_menu(self.menu,self.button_list)
         else: self.menu = menu
 
-    def setup_defaults(self,load=None):
+        if load_data is not None: self.load(load_data)
 
-        if load is not None:
-            load['info']['interactive_mode'] = 'off'
-            return load['style'],load['info'],load['data']
+    def setup_defaults(self,load_data=None):
 
         style = {
         'fill_color':'deepskyblue',
@@ -80,6 +80,13 @@ class labels(widget_base):
         }
 
         data = dict.fromkeys(self.artists_global['Interactive Axes'],self.data_init())
+
+        if load_data is not None:
+            load_data['info']['interactive_mode'] = 'off'
+            load_data['info']['selected'] = False
+            load_data['info']['active_ax'] = None
+
+            return load_data['style'],load_data['info'],data
 
         return style,info,data
 
@@ -506,7 +513,7 @@ class labels(widget_base):
         ##########################################
 
         # Update artists
-        plt.show()
+        if self.show: plt.show()
 
     def get_dists(self,ax):
         # Define a new dictionary to hold the distances
@@ -552,3 +559,75 @@ class labels(widget_base):
         dummy_label.remove()
         # Return the label offsets
         return xoffset,yoffset
+
+    ##########################################
+    ## LOAD METHODS
+    ##########################################
+
+    def load(self,load_data):
+
+        self.widget_on = True
+        self.show = False
+
+        class sim_event:
+            def __init__(self,xdata,ydata,axis):
+                self.xdata = xdata
+                self.ydata = ydata
+                self.inaxes = axis
+
+        for axnum,axis in enumerate(load_data['data']):
+        # Here axis will take on values of 'Axis 1', 'Axis 2', etc.
+
+            # If new axes have yet to be added, return
+            if axnum >= len(self.fig.axes): break
+
+            # Determine the axis on the new figure
+            ax = self.fig.axes[int(axis.split(' ')[-1])-1]
+
+            # Store the points which define the baseline
+            if 'Arrows' in load_data['data'][axis]:
+
+                # Shorten the path
+                arr_dat = load_data['data'][axis]['Arrows']
+
+                # Loop through all the arrows
+                arrow_num = 1
+                while True:
+                    if f'Arrow {arrow_num}' not in arr_dat: break
+                    else:
+                        adata = arr_dat[f'Arrow {arrow_num}']
+
+                        self.info['interactive_mode'] = 'add_arrow'
+
+                        # Call the __call__ method to add the tail point
+                        self(sim_event(adata['Base']['xdata'],adata['Base']['ydata'],ax))
+
+                        # Call the __call__ method to add the head point
+                        self(sim_event(adata['Head']['xdata'],adata['Head']['ydata'],ax))
+
+                        arrow_num += 1
+
+            # Store the points which define the baseline
+            if 'Labels' in load_data['data'][axis]:
+
+                # Shorten the path
+                lab_dat = load_data['data'][axis]['Labels']
+
+                # Loop through all the arrows
+                lab_num = 1
+                while True:
+                    if f'Label {lab_num}' not in lab_dat: break
+                    else:
+                        ldata = lab_dat[f'Label {lab_num}']
+
+                        self.info['interactive_mode'] = 'add_label'
+                        self.info['label_text'] = ldata['label_text']
+
+                        # Call the __call__ method to add the tail point
+                        self(sim_event(ldata['xdata'],ldata['ydata'],ax))
+
+                        lab_num += 1
+
+        self.widget_on = False
+        self.show = True
+        self.info['interactive_mode'] = 'off'

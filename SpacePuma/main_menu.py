@@ -38,36 +38,31 @@ class main_menu(widget_base):
         # Check for an load dictionary
         if load_file is not None:
             plt.ioff()
-            load = cp.deepcopy(pkl.load(open(load_file,'rb')))
-            fig = load['fig']; ax = fig.axes
+            load_data = cp.deepcopy(pkl.load(open(load_file,'rb')))
+            # fig = load_data['fig']; ax = fig.axes
             plt.ion()
-        else: load = None
+        else: load_data = None
 
         # Initialize figure
         self.fig_init(fig,ax)
 
-        if load is None:
-            # Initialize artist list
-            self.artists = dict.fromkeys(self.fig.axes,{})
-            # Import the data from the initialized instance
-            self.artists[self.ax]['Input Data'],self.input_data = self.setup_data(data)
-            self.artists['Primary Artists'] = {self.ax:'Input Data'}
-            self.artists['Interactive Axes'] = [self.ax]
+        # Initialize artist list
+        self.artists = dict.fromkeys(self.fig.axes,{})
+        # Import the data from the initialized instance
+        self.artists[self.ax]['Input Data'],self.input_data = self.setup_data(data)
+        self.artists['Primary Artists'] = {self.ax:'Input Data'}
+        self.artists['Interactive Axes'] = [self.ax]
 
-            # Initialize data list
-            self.data = dict.fromkeys(self.fig.axes,{})
-
-        else:
-            self.artists = load['artists_global']
-            self.data = load['data_global']
+        # Initialize data list
+        self.data = dict.fromkeys(self.fig.axes,{})
 
         # Initialize all sub_menus
-        self.baseline = baseline(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
-        self.fit = fit(self.fig,menu=self.sub_menu,param_menu=self.info_menu,artists_global=self.artists,data_global=self.data,load=load)
-        self.int_peaks = int_peaks(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
-        self.labels = labels(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load=load)
+        self.baseline = baseline(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load_data=load_data)
+        self.int_peaks = int_peaks(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load_data=load_data)
+        self.fit = fit(self.fig,menu=self.sub_menu,param_menu=self.info_menu,artists_global=self.artists,data_global=self.data,load_data=load_data)
+        self.labels = labels(self.fig,menu=self.sub_menu,artists_global=self.artists,data_global=self.data,load_data=load_data)
         self.display_tools = display_tools(self.fig,menu=self.sub_menu,artists_global=self.artists)
-        self.export = export(main_menu=self,menu=self.sub_menu,exp_path=exp_path)
+        self.export = export(self.fig,main_menu=self,menu=self.sub_menu,param_menu=self.info_menu,exp_path=exp_path)
 
         # Widget list
         self.widgets = {
@@ -84,8 +79,8 @@ class main_menu(widget_base):
         self.place_menu(self.menu,self.button_list)
         self.place_menu(self.sub_menu,[])
         self.place_menu(self.info_menu,[])
-        self.fig_show(self.fig)
-        plt.show()
+        # self.fig_show(self.fig)
+        # plt.show()
 
     # Define all main menu buttons and their functionality
     def setup_buttons(self):
@@ -158,6 +153,7 @@ class main_menu(widget_base):
 
                     # Listen for a click
                     self.listen(menuclass)
+                self.place_menu(self.info_menu,[])
             return func
 
         ##########################################
@@ -246,7 +242,7 @@ class main_menu(widget_base):
                 adict = adict[arg]
         self.printdict(adict)
 
-    def get_data(self):
+    def get_data(self,*kwargs):
         # Update the data
         self.active_widget.update(self.artists,self.data)
         # Get the list of axes
@@ -255,11 +251,15 @@ class main_menu(widget_base):
         exp_data = {}
         # Fill the new dictionary
         for ind,ax in enumerate(axes):
-            exp_data[f'Axis {ind+1}'] = self.data[ax]
+            if ax in self.artists.keys():
+                exp_data[f'Axis {ind+1}'] = self.data[ax]
+        for arg in kwargs:
+            if arg in exp_data.keys():
+                exp_data = exp_data[arg]
         # Return the export dictionary
         return exp_data
 
-    def get_artists(self):
+    def get_artists(self,*kwargs):
         # Update the artists
         self.active_widget.update(self.artists,self.data)
         # Get the list of axes
@@ -268,29 +268,49 @@ class main_menu(widget_base):
         exp_artists = {}
         # Fill the new dictionary
         for ind,ax in enumerate(axes):
-            exp_artists[f'Axis {ind+1}'] = self.artists[ax]
+            if ax in self.artists.keys():
+                exp_artists[f'Axis {ind+1}'] = self.artists[ax]
+        for arg in kwargs:
+            if arg in exp_artists.keys():
+                exp_artists = exp_artists[arg]
         # Return the export dictionary
         return exp_artists
 
+    # def export_dict(self):
+    #     self.active_widget.update(self.artists,self.data)
+    #     export = {
+    #     'artists_global': self.artists,
+    #     'data_global': self.data,
+    #     }
+    #     for key in self.widgets.keys():
+    #         if key == 'export' or key == 'display_tools':continue
+    #         w_export = {
+    #         'data': self.widgets[key].get_data(),
+    #         'artists': self.widgets[key].get_artists(),
+    #         'style': self.widgets[key].style,
+    #         'info': self.widgets[key].info
+    #         }
+    #         export[key] = w_export
+    #
+    #     export['fig'] = self.fig
+    #
+    #     return export
+
     def export_dict(self):
         self.active_widget.update(self.artists,self.data)
-        export = {
-        'artists_global': self.artists,
-        'data_global': self.data,
-        }
+        export = {}
+
         for key in self.widgets.keys():
             if key == 'export' or key == 'display_tools':continue
             w_export = {
             'data': self.widgets[key].get_data(),
-            'artists': self.widgets[key].get_artists(),
             'style': self.widgets[key].style,
             'info': self.widgets[key].info
             }
             export[key] = w_export
 
-        export['fig'] = self.fig
-
         return export
+
 
 '''
 

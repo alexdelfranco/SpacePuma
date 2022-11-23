@@ -7,6 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
 
+import pandas as pd
+
 class widget_base:
     '''
     This class serves as the base class for all of the astrochem-tools
@@ -290,6 +292,16 @@ class widget_base:
         # Return the widget toggle
         return self.widget_on
 
+# FUNCTIONAL METHODS
+
+    def dict_depth(self,dct):
+        depths = []
+        for key in dct:
+            if type(dct[key]) == dict:
+                depths.append(self.dict_depth(dct[key]))
+        if len(depths) == 0: depths.append(0)
+        return max(depths)+1
+
 # PRINT AND RETURN METHODS
 
     def data_tree(self,*kwargs):
@@ -306,18 +318,22 @@ class widget_base:
                 adict = adict[arg]
         self.printdict(adict)
 
-    def get_data(self):
+    def get_data(self,*kwargs):
         # Get the list of axes
         axes = self.get_axes()
         # Create a new data dictionary for data export
         exp_data = {}
         # Fill the new dictionary
         for ind,ax in enumerate(axes):
-            exp_data[f'Axis {ind+1}'] = self.data[ax]
+            if ax in self.data:
+                exp_data[f'Axis {ind+1}'] = self.data[ax]
+        for arg in kwargs:
+            if arg in exp_data.keys():
+                exp_data = exp_data[arg]
         # Return the export dictionary
         return exp_data
 
-    def get_artists(self):
+    def get_artists(self,*kwargs):
         # Get the list of axes
         axes = self.get_axes()
         # Create a new data dictionary for data export
@@ -325,6 +341,9 @@ class widget_base:
         # Fill the new dictionary
         for ind,ax in enumerate(axes):
             exp_artists[f'Axis {ind+1}'] = self.artists[ax]
+        for arg in kwargs:
+            if arg in exp_artists.keys():
+                exp_artists = exp_artists[arg]
         # Return the export dictionary
         return exp_artists
 
@@ -336,3 +355,49 @@ class widget_base:
 
     def export_dict(self):
         return {}
+
+    def df(self,datadict,dataframe=pd.DataFrame(),path='',collist=[]):
+        '''
+        Create a dataframe from a Dictionary
+        Recursive method
+        '''
+        for key in datadict:
+            data = datadict[key]
+            if type(data) == dict:
+                # If the data is a dictionary, iterate recusively
+                dataframe = self.df(datadict[key],dataframe,f'{path} - {key}',collist=collist)
+            elif type(data) == list or type(data) == type(np.array([])):
+                # Create a new dataframe with the list
+                newdf = pd.DataFrame(data,columns=[f'{path} - {key}'[3:]])
+                cols = list(dataframe.columns)
+                # Merge the shorter dataframe to the larger one
+                if len(dataframe) > len(newdf): dataframe = dataframe.join(newdf)
+                else: dataframe = newdf.join(dataframe)
+                # Update the list of columns
+                cols.append(list(newdf.columns)[0])
+                # Reorder the dataframe
+                dataframe = dataframe[cols]
+        # Return the final datafame
+        return dataframe
+
+    ##########################################
+    ## FILETYPE EXPORTS
+    ##########################################
+
+    def save_dpt(self,filename,dataframe):
+        # Check to make sure the data is of the right type
+        if type(dataframe) == dict:
+            dataframe = self.df(dataframe)
+            self.save_dpt(filename,dataframe)
+        elif type(dataframe) == list or type(dataframe) == np.ndarray:
+            dataframe = pd.DataFrame()
+            dataframe['data'] = dataframe
+            self.save_dpt(filename,dataframe)
+        elif type(dataframe) == type(pd.DataFrame()):
+            with open(filename, "w") as newFile:
+                for index in range(len(dataframe)):
+                    dataline = ''
+                    for point in dataframe.iloc[index]:
+                        dataline += f'{point} '
+                    newFile.write(f'{dataline[:-1]}\n')
+        else: print('Please enter valid data')

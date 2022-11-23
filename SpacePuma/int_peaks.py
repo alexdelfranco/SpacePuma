@@ -11,30 +11,35 @@ import functools
 from scipy.signal import find_peaks,medfilt
 from scipy.integrate import simps
 import seaborn as sns
+import warnings
+
+warnings.filterwarnings("ignore", message="kernel_size exceeds volume extent: the volume will be zero-padded.")
 
 from .base import widget_base
 
 class int_peaks(widget_base):
-    def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load=None):
+    def __init__(self,fig,menu=None,data=None,artists_global=None,data_global=None,load_data=None):
         '''
         '''
+        # Initialize the widget in the off position
         self.widget_on = False
+        # Set the display setting to display output
+        self.show = True
         # Setup the figure
         self.fig = fig
+        # Setup possible load data
+        if load_data is not None:
+            if 'int_peaks' in load_data: load_data = load_data['int_peaks']
 
         # Initialize all global matplotlib artists
         self.artists_global = self.pull_artists(artists_global)
         # Initialize all global data
         self.data_global = self.pull_data(data_global)
         # Create a dictionary using the axes as keys
-        if load is None: self.artists = {}
-        else:
-            # If load is not None, subscript it to the load int_peaks dict
-            load = load['int_peaks']
-            self.artists = load['artists']
+        self.artists = {}
 
         # Initialize defaults
-        self.style,self.info,self.data = self.setup_defaults(load)
+        self.style,self.info,self.data = self.setup_defaults(load_data)
 
         # Initialize all buttons
         self.button_list,self.toggle_buttons = self.setup_buttons()
@@ -44,11 +49,9 @@ class int_peaks(widget_base):
             self.place_menu(self.menu,self.button_list)
         else: self.menu = menu
 
-    def setup_defaults(self,load=None):
+        if load_data is not None: self.load(load_data)
 
-        if load is not None:
-            load['info']['interactive_mode'] = 'off'
-            return load['style'],load['info'],load['data']
+    def setup_defaults(self,load_data=None):
 
         style = {
         'fill_color':'deepskyblue',
@@ -76,6 +79,13 @@ class int_peaks(widget_base):
         }
 
         data = dict.fromkeys(self.artists_global['Interactive Axes'],self.data_init())
+
+        if load_data is not None:
+            load_data['info']['interactive_mode'] = 'off'
+            load_data['info']['selected'] = False
+            load_data['info']['active_ax'] = None
+
+            return load_data['style'],load_data['info'],data
 
         return style,info,data
 
@@ -223,7 +233,7 @@ class int_peaks(widget_base):
 
     def data_init(self):
         return {
-        'Range':[],
+        'IntPeakRange':[],
         'Integration':{'xdata':[],'ydata':[],'Display':False},
         'Peaks':{'xdata':[],'Display':False},
         }
@@ -264,7 +274,7 @@ class int_peaks(widget_base):
             # Check to see if the axis is an interactive axis
             if ax not in self.artists_global['Interactive Axes']: return
             # Check to see how many bounds are already in the axis
-            if len(self.data[ax]['Range']) == 2: return
+            if len(self.data[ax]['IntPeakRange']) == 2: return
 
             # Clear all other points
             self.clear(self.artists[ax]['New Bound'],ax=ax,vlines=True)
@@ -272,10 +282,10 @@ class int_peaks(widget_base):
             self.info['selected'] = False
 
             # Add the point to the array of boundaries
-            self.data[ax]['Range'].append(event.xdata)
+            self.data[ax]['IntPeakRange'].append(event.xdata)
 
             # Replot all the points, including the extra one
-            self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['Range'],ax)
+            self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['IntPeakRange'],ax)
 
         ##########################################
         ## ADJUST RANGE
@@ -293,7 +303,7 @@ class int_peaks(widget_base):
                 self.clear(self.artists[ax]['New Bound'],ax=ax,vlines=True)
                 # Find the distance between the click and each boundary
                 self.dat = event.xdata
-                hdists = self.hdist(event.xdata,self.data[ax]['Range'],ax)
+                hdists = self.hdist(event.xdata,self.data[ax]['IntPeakRange'],ax)
                 self.hdists = hdists
                 # Find the index of the point closest to the click
                 self.info['close_bound'] = np.nanargmin(hdists)
@@ -302,24 +312,24 @@ class int_peaks(widget_base):
                 if hdists[self.info['close_bound']] < self.info['click_dist']:
 
                     # Replot the selected boundary in a different color
-                    self.set_segments(self.artists[ax]['Selected Bound'],[self.data[ax]['Range'][self.info['close_bound']]],ax)
+                    self.set_segments(self.artists[ax]['Selected Bound'],[self.data[ax]['IntPeakRange'][self.info['close_bound']]],ax)
                     # State that a point has been selected
                     self.info['selected'] = True
 
             # If a point has already been selected
             else:
                 # Remove the bound from the data array
-                self.data[ax]['Range'] = np.delete(self.data[ax]['Range'],self.info['close_bound'])
+                self.data[ax]['IntPeakRange'] = np.delete(self.data[ax]['IntPeakRange'],self.info['close_bound'])
                 # Remove the temporary plotted point
                 self.clear(self.artists[ax]['Selected Bound'],ax=ax,vlines=True)
 
                 # Plot the new line
                 self.set_segments(self.artists[ax]['New Bound'],[event.xdata],ax)
                 # Add the point to the array of points
-                self.data[ax]['Range'] = np.append(self.data[ax]['Range'],event.xdata)
+                self.data[ax]['IntPeakRange'] = np.append(self.data[ax]['IntPeakRange'],event.xdata)
 
                 # Replot all points
-                self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['Range'],ax)
+                self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['IntPeakRange'],ax)
 
                 # Replot the integration
                 if self.data[ax]['Integration']['Display']: self.integrate(ax)
@@ -400,7 +410,7 @@ class int_peaks(widget_base):
         ##########################################
 
         # Update artists
-        plt.show()
+        if self.show: plt.show()
 
     ##########################################
     ## INTEGRATION METHODS
@@ -419,7 +429,7 @@ class int_peaks(widget_base):
         # Pull out the x and y data from that curve
         xdata,ydata = self.artists_global[ax][curve].get_data()
         # Determine the range of integration
-        xmin,xmax = sorted(self.data[ax]['Range'])
+        xmin,xmax = sorted(self.data[ax]['IntPeakRange'])
 
         # Determine the indices of the data values within the range
         ii = np.squeeze(np.where((xdata > xmin) & (xdata < xmax)))
@@ -451,7 +461,7 @@ class int_peaks(widget_base):
         xdata,ydata = self.artists_global[ax][curve].get_data()
 
         # Find the indeces of the data that are within the range
-        xmin,xmax = sorted(self.data[ax]['Range'])
+        xmin,xmax = sorted(self.data[ax]['IntPeakRange'])
         ii = np.squeeze(np.where((xdata > xmin) & (xdata < xmax)))
 
         # Subset the x and y data
@@ -470,3 +480,60 @@ class int_peaks(widget_base):
         flat_spec = np.abs(normspec - sp_medavg)
         peaks,_ = find_peaks(flat_spec,height=height,distance=distance)
         return peaks
+
+    ##########################################
+    ## LOAD METHODS
+    ##########################################
+
+    def load(self,load_data):
+
+        self.widget_on = True
+        self.show = False
+
+        class sim_event:
+            def __init__(self,xdata,ydata,axis):
+                self.xdata = xdata
+                self.ydata = ydata
+                self.inaxes = axis
+
+        for axnum,axis in enumerate(load_data['data']):
+        # Here axis will take on values of 'Axis 1', 'Axis 2', etc.
+
+            # If new axes have yet to be added, return
+            if axnum >= len(self.fig.axes): break
+
+            # Determine the axis on the new figure
+            ax = self.fig.axes[int(axis.split(' ')[-1])-1]
+
+            # Store the points which define the baseline
+            if 'IntPeakRange' in load_data['data'][axis]:
+                range = load_data['data'][axis]['IntPeakRange']
+                self.info['interactive_mode'] = 'add_range'
+
+                # Call the __call__ method to add the points with simulated events
+                [self(sim_event(xdata,None,ax)) for xdata in range]
+
+            else: continue
+
+            # If there was an integration or a series of peaks
+            if 'Integration' in load_data['data'][axis]:
+
+                # Determine whether the integration should be displayed
+                if load_data['data'][axis]['Integration']['Display']:
+
+                    self.info['interactive_mode'] = 'integrate'
+                    # Call the __call__ method to add the points with simulated events
+                    self(sim_event(None,None,ax))
+
+            if 'Peaks' in load_data['data'][axis]:
+
+                # Determine whether the peaks should be displayed
+                if load_data['data'][axis]['Peaks']['Display']:
+
+                    self.info['interactive_mode'] = 'find_peaks'
+                    # Call the __call__ method to add the points with simulated events
+                    self(sim_event(None,None,ax))
+
+        self.widget_on = False
+        self.show = True
+        self.info['interactive_mode'] = 'off'

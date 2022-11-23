@@ -22,26 +22,28 @@ class fit(widget_base,fit_methods):
     def fits(self):
         gaussian_fit(self)
 
-    def __init__(self,fig,menu=None,param_menu=None,data=None,artists_global=None,data_global=None,load=None):
+    def __init__(self,fig,menu=None,param_menu=None,data=None,artists_global=None,data_global=None,load_data=None):
         '''
         '''
+        # Initialize the widget in the off position
         self.widget_on = False
+        # Set the display setting to display output
+        self.show = True
         # Setup the figure
         self.fig = fig
+        # Setup possible load data
+        if load_data is not None:
+            if 'fit' in load_data: load_data = load_data['fit']
 
         # Initialize all global matplotlib artists
         self.artists_global = self.pull_artists(artists_global)
         # Initialize all global data
         self.data_global = self.pull_data(data_global)
         # Create a local artist dictionary
-        if load is None: self.artists = {}
-        else:
-            # If load is not None, subscript it to the load fit dict
-            load = load['fit']
-            self.artists = load['artists']
+        self.artists = {}
 
         # Initialize defaults
-        self.style,self.info,self.data = self.setup_defaults(load)
+        self.style,self.info,self.data = self.setup_defaults(load_data)
 
         # Setup the fits
         self.fits()
@@ -58,11 +60,9 @@ class fit(widget_base,fit_methods):
             self.place_menu(self.param_menu,self.param_button_list)
         else: self.param_menu = param_menu
 
-    def setup_defaults(self,load=None):
+        if load_data is not None: self.load(load_data)
 
-        if load is not None:
-            load['info']['interactive_mode'] = 'off'
-            return load['style'],load['info'],load['data']
+    def setup_defaults(self,load_data=None):
 
         style = {
         'fill_color':'deepskyblue',
@@ -97,6 +97,13 @@ class fit(widget_base,fit_methods):
         }
 
         data = dict.fromkeys(self.artists_global['Interactive Axes'],self.data_init())
+
+        if load_data is not None:
+            load_data['info']['interactive_mode'] = 'off'
+            load_data['info']['selected'] = False
+            load_data['info']['active_ax'] = None
+
+            return load_data['style'],load_data['info'],data
 
         return style,info,data
 
@@ -313,7 +320,7 @@ class fit(widget_base,fit_methods):
 
     def data_init(self):
         return {
-        'Range':[],
+        'FitRange':[],
         'Fit':{'Axis':[]}
         }
 
@@ -353,7 +360,7 @@ class fit(widget_base,fit_methods):
             # Check to see if the axis is an interactive axis
             if ax not in self.artists_global['Interactive Axes']: return
             # Check to see how many bounds are already in the axis
-            if len(self.data[ax]['Range']) == 2: return
+            if len(self.data[ax]['FitRange']) == 2: return
 
             # Clear all other points
             self.clear(self.artists[ax]['New Bound'],ax=ax,vlines=True)
@@ -361,10 +368,10 @@ class fit(widget_base,fit_methods):
             self.info['selected'] = False
 
             # Add the point to the array of boundaries
-            self.data[ax]['Range'].append(event.xdata)
+            self.data[ax]['FitRange'].append(event.xdata)
 
             # Replot all the points, including the extra one
-            self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['Range'],ax)
+            self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['FitRange'],ax)
 
         ##########################################
         ## ADJUST RANGE
@@ -382,7 +389,7 @@ class fit(widget_base,fit_methods):
                 self.clear(self.artists[ax]['New Bound'],ax=ax,vlines=True)
                 # Find the distance between the click and each boundary
                 self.dat = event.xdata
-                hdists = self.hdist(event.xdata,self.data[ax]['Range'],ax)
+                hdists = self.hdist(event.xdata,self.data[ax]['FitRange'],ax)
                 self.hdists = hdists
                 # Find the index of the point closest to the click
                 self.info['close_bound'] = np.nanargmin(hdists)
@@ -391,24 +398,24 @@ class fit(widget_base,fit_methods):
                 if hdists[self.info['close_bound']] < self.info['click_dist']:
 
                     # Replot the selected boundary in a different color
-                    self.set_segments(self.artists[ax]['Selected Bound'],[self.data[ax]['Range'][self.info['close_bound']]],ax)
+                    self.set_segments(self.artists[ax]['Selected Bound'],[self.data[ax]['FitRange'][self.info['close_bound']]],ax)
                     # State that a point has been selected
                     self.info['selected'] = True
 
             # If a point has already been selected
             else:
                 # Remove the bound from the data array
-                self.data[ax]['Range'] = np.delete(self.data[ax]['Range'],self.info['close_bound'])
+                self.data[ax]['FitRange'] = np.delete(self.data[ax]['FitRange'],self.info['close_bound'])
                 # Remove the temporary plotted point
                 self.clear(self.artists[ax]['Selected Bound'],ax=ax,vlines=True)
 
                 # Plot the new line
                 self.set_segments(self.artists[ax]['New Bound'],[event.xdata],ax)
                 # Add the point to the array of points
-                self.data[ax]['Range'] = np.append(self.data[ax]['Range'],event.xdata)
+                self.data[ax]['FitRange'] = np.append(self.data[ax]['FitRange'],event.xdata)
 
                 # Replot all points
-                self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['Range'],ax)
+                self.set_segments(self.artists[ax]['Bounds'],self.data[ax]['FitRange'],ax)
 
                 # No point is currently selected
                 self.info['selected'] = False
@@ -424,12 +431,12 @@ class fit(widget_base,fit_methods):
             if ax not in self.artists_global['Interactive Axes']: return
 
             # Only fit if there are two boundaries
-            if len(self.data[ax]['Range']) < 2: return
+            if len(self.data[ax]['FitRange']) < 2: return
 
             if self.info['fit_type'] is not None:
                 ## Import functions from a module
                 imported_fit = self.info['fit_dict'][self.info['fit_type']]
-                self.fit(imported_fit,ax,new_ax=imported_fit.new_ax)
+                self.fit(imported_fit,ax,self.info,new_ax=imported_fit.new_ax)
 
         ##########################################
         ## CLEAR AXIS
@@ -516,7 +523,7 @@ class fit(widget_base,fit_methods):
         ##########################################
 
         # Update artists
-        plt.show()
+        if self.show: plt.show()
 
     ##########################################
     ## ACTIVATE AND DEACTIVATE
@@ -543,3 +550,68 @@ class fit(widget_base,fit_methods):
         self.place_menu(self.param_menu,[])
         # Return the widget toggle
         return self.widget_on
+
+    ##########################################
+    ## LOAD METHODS
+    ##########################################
+
+    def load(self,load_data):
+
+        self.widget_on = True
+        self.show = False
+
+        class sim_event:
+            def __init__(self,xdata,ydata,axis):
+                self.xdata = xdata
+                self.ydata = ydata
+                self.inaxes = axis
+
+        for axis in load_data['data']:
+        # Here axis will take on values of 'Axis 1', 'Axis 2', etc.
+
+            # Determine the axis on the new figure
+            ax = self.fig.axes[int(axis.split(' ')[-1])-1]
+
+            # Store the points which define the baseline
+            if 'FitRange' in load_data['data'][axis]:
+                range = load_data['data'][axis]['FitRange']
+                self.info['interactive_mode'] = 'add_range'
+
+                # Call the __call__ method to add the points with simulated events
+                [self(sim_event(xdata,None,ax)) for xdata in range]
+
+            else: continue
+
+            # If there was a fit
+            if 'Fit' in load_data['data'][axis]:
+
+                fit = load_data['data'][axis]['Fit']
+
+                # Loop through all the fits
+                fit_num = 1
+                while True:
+                    if f'Fit {fit_num}' not in fit: break
+                    else:
+                        self.info['fit_type'] = fit[f'Fit {fit_num}']['fit_type']
+                        self.info['fit_params'] = fit[f'Fit {fit_num}']['fit_params']
+                        self.data[ax]['FitRange'] = fit[f'Fit {fit_num}']['FitRange']
+
+                        # Apply fit order
+                        self.info['fit_order'] = fit[f'Fit {fit_num}']['fit_order']
+                        # Retrieve the fit module
+                        fit_module = self.info['fit_dict'][self.info['fit_type']]
+                        # Set the fit order in the module
+                        fit_module.fit_order = self.info['fit_order']
+                        # Recalculate the parameters
+                        fit_module.parameters = fit_module.get_params(self.info['fit_params'])
+
+                        self.info['interactive_mode'] = 'fit'
+
+                        # Call the __call__ method to add the points with simulated events
+                        self(sim_event(None,None,ax))
+
+                        fit_num += 1
+
+        self.widget_on = False
+        self.show = True
+        self.info['interactive_mode'] = 'off'
