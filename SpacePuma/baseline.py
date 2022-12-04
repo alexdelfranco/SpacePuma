@@ -10,7 +10,7 @@ import functools
 
 from scipy.interpolate import interp1d
 
-from base import widget_base
+from .base import widget_base
 
 class baseline(widget_base):
     '''

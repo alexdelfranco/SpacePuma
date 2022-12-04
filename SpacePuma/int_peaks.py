@@ -13,6 +13,9 @@ from scipy.integrate import simps
 import seaborn as sns
 import warnings
 
+import logging
+logging.getLogger().setLevel(logging.CRITICAL)
+
 warnings.filterwarnings("ignore", message="kernel_size exceeds volume extent: the volume will be zero-padded.")
 
 from .base import widget_base
@@ -355,6 +358,9 @@ class int_peaks(widget_base):
             else:
                 # Clear the peaks
                 self.artists[ax]['Integration'].set_paths([])
+                # Remove the peak from the legend
+                self.artists[ax]['Integration'].set_label('_')
+                ax.legend()
                 # Set display to false
                 self.data[ax]['Integration']['Display'] = False
 
@@ -441,6 +447,8 @@ class int_peaks(widget_base):
 
         # Use scipy's simpsons integration technique -- negative for decreasing x range
         self.data[ax]['Integration']['area'] = area = simps(y=ydata,x=xdata)
+
+        self.artists[ax]['Integration'].set_label('_')
 
         # Plot the integration
         self.artists[ax]['Integration'] = ax.fill_between(xdata,ydata,label=f'Area: {round(area,3)}',color='dodgerblue',alpha=0.6)
