@@ -451,7 +451,7 @@ class int_peaks(widget_base):
         self.artists[ax]['Integration'].set_label('_')
 
         # Plot the integration
-        self.artists[ax]['Integration'] = ax.fill_between(xdata,ydata,label=f'Area: {area:.3e})}',color='dodgerblue',alpha=0.6)
+        self.artists[ax]['Integration'] = ax.fill_between(xdata,ydata,label=f'Area: {area:.3e}',color='dodgerblue',alpha=0.6)
         ax.legend()
 
     ##########################################
