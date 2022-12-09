@@ -1,4 +1,4 @@
-# Author: Alex DelFranco
+Float# Author: Alex DelFranco
 # Advisor: Rafa Martin Domenech
 # Institution: Center for Astrophysics | Harvard & Smithsonian
 # Date: 28 August 2022
@@ -206,59 +206,59 @@ class fit(widget_base,fit_methods):
             self.info['parameter'] = self.parameter_select.value
 
             # Retrieve the current values of the fit parameters
-            self.estimate_inttext.value = self.info['fit_params'][self.info['parameter']]['Estimate']
-            self.lower_bound_inttext.value = self.info['fit_params'][self.info['parameter']]['Lower Bound']
-            self.upper_bound_inttext.value = self.info['fit_params'][self.info['parameter']]['Upper Bound']
+            self.estimate_floattext.value = self.info['fit_params'][self.info['parameter']]['Estimate']
+            self.lower_bound_floattext.value = self.info['fit_params'][self.info['parameter']]['Lower Bound']
+            self.upper_bound_floattext.value = self.info['fit_params'][self.info['parameter']]['Upper Bound']
 
         self.parameter_select.observe(functools.partial(parameter_select_clicked, self=self))
 
         #####################
 
         # Add an integer text widget to set a paramter estimate
-        self.estimate_inttext = widgets.IntText(description='Estimate:',value=5,style={'description_width':'initial'},layout = widgets.Layout(width='120px'))
+        self.estimate_floattext = widgets.FloatText(description='Estimate:',value=5,style={'description_width':'initial'},layout = widgets.Layout(width='120px'))
 
-        def estimate_inttext_clicked(b, self = self):
+        def estimate_floattext_clicked(b, self = self):
 
             # Save the fit parameter
-            self.info['fit_params'][self.info['parameter']]['Estimate'] = cp.deepcopy(self.estimate_inttext.value)
+            self.info['fit_params'][self.info['parameter']]['Estimate'] = cp.deepcopy(self.estimate_floattext.value)
             # Retrieve the fit module
             fit_module = self.info['fit_dict'][self.info['fit_type']]
             # Recalculate the parameters
             fit_module.parameters = fit_module.get_params(self.info['fit_params'])
 
-        self.estimate_inttext.observe(functools.partial(estimate_inttext_clicked, self=self))
+        self.estimate_floattext.observe(functools.partial(estimate_floattext_clicked, self=self))
 
         #####################
 
         # Add an integer text widget to set the lower paramter bound
-        self.lower_bound_inttext = widgets.IntText(description='Lower Bound:',value=0,style={'description_width':'initial'},layout = widgets.Layout(width='150px'))
+        self.lower_bound_floattext = widgets.FloatText(description='Lower Bound:',value=0,style={'description_width':'initial'},layout = widgets.Layout(width='150px'))
 
-        def lower_bound_inttext_clicked(b, self = self):
+        def lower_bound_floattext_clicked(b, self = self):
 
             # Save the fit parameter
-            self.info['fit_params'][self.info['parameter']]['Lower Bound'] = cp.deepcopy(self.lower_bound_inttext.value)
+            self.info['fit_params'][self.info['parameter']]['Lower Bound'] = cp.deepcopy(self.lower_bound_floattext.value)
             # Retrieve the fit module
             fit_module = self.info['fit_dict'][self.info['fit_type']]
             # Recalculate the parameters
             fit_module.parameters = fit_module.get_params(self.info['fit_params'])
 
-        self.lower_bound_inttext.observe(functools.partial(lower_bound_inttext_clicked, self=self))
+        self.lower_bound_floattext.observe(functools.partial(lower_bound_floattext_clicked, self=self))
 
         #####################
 
         # Add an integer text widget to set the upper paramter bound
-        self.upper_bound_inttext = widgets.IntText(description='Upper Bound:',value=10,style={'description_width':'initial'},layout = widgets.Layout(width='150px'))
+        self.upper_bound_floattext = widgets.FloatText(description='Upper Bound:',value=10,style={'description_width':'initial'},layout = widgets.Layout(width='150px'))
 
-        def upper_bound_inttext_clicked(b, self = self):
+        def upper_bound_floattext_clicked(b, self = self):
 
             # Save the fit parameter
-            self.info['fit_params'][self.info['parameter']]['Upper Bound'] = cp.deepcopy(self.upper_bound_inttext.value)
+            self.info['fit_params'][self.info['parameter']]['Upper Bound'] = cp.deepcopy(self.upper_bound_floattext.value)
             # Retrieve the fit module
             fit_module = self.info['fit_dict'][self.info['fit_type']]
             # Recalculate the parameters
             fit_module.parameters = fit_module.get_params(self.info['fit_params'])
 
-        self.upper_bound_inttext.observe(functools.partial(upper_bound_inttext_clicked, self=self))
+        self.upper_bound_floattext.observe(functools.partial(upper_bound_floattext_clicked, self=self))
 
         #####################
 
@@ -300,7 +300,7 @@ class fit(widget_base,fit_methods):
 
         return ([self.add_range_button,self.adjust_range_button,self.fit_type_select,self.fit_button,self.clear_axis_button],
                     [self.add_range_button,self.adjust_range_button,self.fit_button,self.clear_axis_button],
-                    [self.parameter_select,self.estimate_inttext,self.lower_bound_inttext,self.upper_bound_inttext,self.fit_order_inttext])
+                    [self.parameter_select,self.estimate_floattext,self.lower_bound_floattext,self.upper_bound_floattext,self.fit_order_inttext])
 
     ##########################################
     ## UPDATE METHODS
