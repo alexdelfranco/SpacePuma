@@ -1,4 +1,4 @@
-Float# Author: Alex DelFranco
+# Author: Alex DelFranco
 # Advisor: Rafa Martin Domenech
 # Institution: Center for Astrophysics | Harvard & Smithsonian
 # Date: 28 August 2022
